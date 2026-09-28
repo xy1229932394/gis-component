@@ -5,6 +5,12 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { preloadAMap } from '@/utils/amap'
+
+onMounted(() => {
+  preloadAMap()
+})
 </script>
 
 <style scoped>
