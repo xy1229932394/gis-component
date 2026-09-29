@@ -17,6 +17,8 @@ export default defineConfig({
       '@': resolve(__dirname, 'src')
     }
   },
+  server: {},
+  preview: {},
   build: {
     outDir: 'dist',
     rollupOptions: {

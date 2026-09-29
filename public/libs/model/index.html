@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="en" style="overflow: hidden;">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>创建场景</title>
+    <!-- ECharts-js -->
+    <script src="../eCharts/echarts.min.js"></script>
+    <script src="https://laozicloud-sdk.obs.cn-east-2.myhuaweicloud.com:443/h5/app.js" id="AMRT"></script>
+</head>
+<body style="padding: 0; margin: 0;display: flex; justify-content: center; align-items: center; position: relative;">
+    <div id="loading" class="loading"  style="position: fixed;">
+        <div id="loading-container">
+            <div class="loader"></div>
+            <div class="text">拼命加载中...</div>
+        </div>
+    </div>
+    <div id="container" style="width: 100%;height: 100vh;overflow: hidden;" />
+    <div id="rf" style="width: 27rem;height:14.5rem; display: none;"></div>
+    <div id="yf" style="width: 27rem;height:14.5rem; display: none;"></div>
+    <div id="jr" style="width: 27rem;height:14.5rem; display: none;"></div>
+    <div id="gl" style="width: 27rem;height:14.5rem; display: none;"></div>
+    <div id="dy" style="width: 27rem;height:14.5rem; display: none;"></div>
+    <div
+        style="position: absolute; z-index: 99; left: 50%; margin-left: -4rem; bottom: 15px; opacity: 0.6; cursor: pointer;">
+        <input type="button" id="button1" onclick="btn()" value="定点漫游" />
+        <input type="button" id="button1" onclick="btn1()" value="漫游" />
+        <input type="button" id="button2" onclick="btn2()" value="结束" />
+    </div>
+</body>
+
+</html>
+<script>
+    //鉴权参数
+    const param = {
+        appkey: 'IYjusZiCgezN',
+        appsecret: 'vsKmqgF9pTQrZoxyiYkBG8ONazRfnW3J',
+    }
+    //创建一个场景
+    const viewer = new AMRT.Viewer('container', /*容器dom或者dom对应的id*/ param)
+    //创建一个热点图层 layer
+    let layer_div = viewer.hotSpotManager.createLayer(), hotspots = []
+    let layer_title = viewer.hotSpotManager.createLayer()
+    let layer_icon = viewer.hotSpotManager.createLayer()
+    let layer_btn = viewer.hotSpotManager.createLayer()
+    let toursList = [] // 存储所有tour
+    let patrolToursList = [] // 存储所有tour
+    let formData = {}
+    // 基础配置
+    // 设置黑色背景色
+    viewer.sceneManager.setBackground('#000')
+    //最大俯仰角度
+    viewer.controls.maxPolarAngle = 75;
+    //最小俯仰角度
+    viewer.controls.minPolarAngle = -90;
+    let timeNum = null // 定时器
+    let oldDomId = null // 历史domID, 用于移除弹窗中的echarts, 避免删除弹窗dom时把echarts的dom一起移除
+    let indexNext = 0  //弹窗切换索引
+    let echartDomId = null // echarts弹窗id
+    //路径
+    let path =
+        [{
+            "x": -145.9848492194302,
+            "y": 1.0810161473037851,
+            "z": -104.93138538378709
+        },{
+            "x": -145.754531812085,
+            "y": 1.14320089980727496,
+            "z": -84.1827138990167
+        },{
+            "x": -110.08583573830849,
+            "y": 1.14320089980731193,
+            "z": -81.42145345205903
+        },{
+            "x": -108.23187085019008,
+            "y": 1.14320089980732026,
+            "z": 37.96363540413534
+        },{
+            "x": -212.67873897369236,
+            "y": 1.14320089980730222,
+            "z": 38.658255863316604
+        },{
+            "x": -214.40831114635122,
+            "y":     -0.14320089980730122,
+            "z": 116.04764868445531
+        },{
+            "x": -106.22442923343444,
+            "y": 1.14320089980735573,
+            "z": 115.86427788913828
+        },{
+            "x": -104.2066830083367,
+            "y": 1.14320089980731487,
+            "z": 95.73342425228445
+        },{
+            "x": -72.80036767391705,
+            "y": 1.1432008998072787,
+            "z": 96.57629448931394
+        },{
+            "x": -71.52316279543048,
+            "y": 1.14320089980733636,
+            "z": 192.4116343841911
+        },{
+            "x": -11.778206456074713,
+            "y": 1.14320089980733608,
+            "z": 191.13982901878416
+        },{
+            "x": -10.25875939886022,
+            "y": 1.14320089980731526,
+            "z": 97.34804698043754
+        },{
+            "x": -103.60701831278818,
+            "y": 1.14320089980731443,
+            "z": 93.64896862228795
+        },{
+            "x": -106.772345971325,
+            "y": 1.14320089980727538,
+            "z": -82.21632803473312
+        }]
+    //相机方向
+    const initView = {
+        "position": [
+            -86.35799781446642,
+            82.51250752088914,
+            -225.8802639382996
+        ],
+        "target": [
+            -86.1915488771483,
+            13.484802866493055,
+            1.1334230210668466
+        ]
+    }
+    let pathTween = null;
+    let runModel = null;
+    let tension = 0.2, time = 15, loopType = 1, loopCount = 1;
+    let rotateX = 0, rotateY = 30, rotateZ = 0;
+    setLoding(true);
+    //通过老子云平台 ID 加载一个模型
+    const model = viewer.loadModel('1881971850133770240', {
+        onLoad: () => {
+            //设置视角，该数据可以通过 viewer.controls.getView 方法获得
+            viewer.controls.setView(initView)
+            // viewer.threePersonControls.setView(initView);  
+
+            // 雷达效果
+            let radar;
+            // 颜色，半径，速度
+            let radarColor = '#00e8fc', radarSpeed = 1.8, radarRadius = 0.05;
+            let ld1 = {
+                color: radarColor,
+                size: radarRadius,
+                speed: radarSpeed,
+            }
+            radar = viewer.effectManager.addRadarScanning(ld1);
+            radar.position.set(
+                -134.75930527088008, 5.965011795261355,-11.856367301596975);
+            radar.scale.set(120, 120, 120)
+            toursList.push(radar)
+            // 闪烁效果
+            addTours([-43.735614124788455, 3.268306521432214, 132.55412505726883], '#FFFF01');
+            addTours([-47.99420367347235, 6.836416404056854, 8.803015976276736], '#ffab03');
+            addTours([-47.263723948707714, 6.1187734650826508, 68.66213211586849], '#F08080');
+            addTours([-47.263723948707714, 6.1187734650826508, 50.48085546867028], '#FF7F50');
+            addTours([-158.87188173105585, 5.965011795261355,-11.856367301596975], '#0AFF98');
+            addTours([-143.1374757990635, 8.48919716599255, -49.29269392084421], '#0A89FF');
+            // 巡逻闪烁点
+            let PatrolToursList = [
+                {
+                    point: {
+                        "position": [
+                            -108.02128192354823,
+                            2.86300140397696,
+                            -84.17093372815847
+                        ],
+                        "target": [
+                            -84.76283183618945,
+                            4.322522628780256,
+                            -1.746045697871395
+                        ]
+                    },
+                    name: 'point1'
+
+                },
+                {
+                    point: {
+                        "position": [
+                            -106.37253048512576,
+                            2.868159272460176,
+                            -30.34944969807123
+                        ],
+                        "target": [
+                            -96.80525393903548,
+                            -0.55276531293637,
+                            10.161258107166745
+                        ]
+                    },
+                    name: 'point2'
+
+                },
+                {
+                    point:
+                    {
+                        "position": [
+                            -108.37253048512576,
+                            2.168159272460176,
+                            35.34944969807123
+                        ],
+                        "target": [
+                            -115.63047149217826,
+                            8.492012455926039,
+                            36.675685736047626
+                       ]
+                    },
+                    name: 'point3'
+
+                },
+                {
+                    point:
+                    {
+                        "position": [
+                            -167.37253048512576,
+                            2.108159272460176,
+                            35.34944969807123
+                        ],
+                        "target": [
+                            -172.34773173243406,
+                            8.14320089980730266,
+                            43.90384115139403
+                        ]
+                    },
+                    name: 'point4'
+
+                },
+                {
+                    point: {
+                        "position": [
+                            -175.37253048512576,
+                            1.568159272460176,
+                            110.538542282612461
+                        ],
+                        "target": [
+                           -174.21800866970682,
+                            8.953185573819095,
+                            109.86683222853604
+                        ]
+                    }, name: 'point5'
+                },
+                {
+                    point:
+                    {
+                        "position": [
+                            -108.37253048512576,
+                            2.0773369793683,
+                            110.938542282612461
+                        ],
+                        "target": [
+                           -107.37253048512576,
+                            8.953185573819095,
+                            109.56683222853604
+                        ]
+                    },
+                    name: 'point6'
+                },
+                {
+                    point: {
+                        "position": [
+                            -78.19155139507511,
+                            1.65807618325183,
+                            95.133083242020243
+                        ],
+                        "target": [
+                            -76.6915488771483,
+                            8.484802866493055,
+                            94.1334230210668466
+                        ]
+                    }
+                    , name: 'point7'
+                },
+                {
+                    point:
+                    {
+                        "position": [
+                            -50.01063626491936,
+                            1.3406783051956,
+                            -4.855993463196217
+                        ],
+                        "target": [
+                            -46.50468068433238,
+                            8.201198800342787,
+                            -1.2126426511679007
+                        ]
+                    },
+                    name: 'point8'
+                },
+                {
+                    point:
+                    {
+                        "position": [
+                            -62.01063626491936,
+                            1.3406783051956,
+                            61.855993463196217
+                        ],
+                        "target": [
+                            -61.01063626491936,
+                            10.201198800342787,
+                            62.2126426511679007
+                        ]
+                    },
+                    name: 'point9'
+                },
+                // {
+                //     point:
+                //     {
+                //         "position": [
+                //             -26.559340690935771,
+                //             1598.5390528536157,
+                //             -130.21283744661767
+                //         ],
+                //         "target": [
+                //             -27.080064407706382,
+                //             1603.1816235200517,
+                //             -132.48702103418114
+                //         ]
+                //     },
+                //     name: 'point10'
+                // }
+            ];
+            PatrolToursList.forEach(item => {
+                addPatrolTours(item.point, item.name)
+            })
+            //流光线
+            // let path = [
+            //     {
+            //         "x": -20.70233277922774,
+            //         "y": 1597.6783731292205,
+            //         "z": -150.59107148641138
+            //     },
+            //     {
+            //         "x": -20.45510159063427,
+            //         "y": 1597.3213132870276,
+            //         "z": -100.60986623706172
+            //     },
+            //     {
+            //         "x": -90.56894182739538,
+            //         "y": 1590.1210026555646,
+            //         "z": -100.86075267507002
+            //     }
+
+            // ]
+            // let path2 = [
+            //     {
+            //         "x": -80.56894182739538,
+            //         "y": 1590.1210026555646,
+            //         "z": -108.86075267507002
+            //     },
+            //     {
+            //         "x": -80.75688565763728,
+            //         "y": 1590.6453325084885,
+            //         "z": -142.94870314201745
+            //     }, {
+            //         "x": -25.41595733177897,
+            //         "y": 1597.8273265414598,
+            //         "z": -142.18964331631446
+            //     }, {
+            //         "x": -25.33036916934217,
+            //         "y": 1598.6002835226282,
+            //         "z": -206.65150095565832
+            //     }
+            // ]
+            // let path3 = [
+            //     {
+            //         "x": -27.222910332189088,
+            //         "y": 1598.245947914861,
+            //         "z": -203.69176726592792
+            //     }, {
+            //         "x": -88.20998338582747,
+            //         "y": 1591.6575799855118,
+            //         "z": -205.40509849517701
+            //     }, {
+            //         "x": -89.68712492129717,
+            //         "y": 1590.9862882689274,
+            //         "z": -172.2161576140871
+            //     }
+            // ]
+            // // 流光线
+            // let opt1 = {
+            //     color: '#ffff00', //颜色
+            //     radius: 6,  //半径
+            //     tension: 0.05, //平滑度
+            //     speed: 0.8,
+            //     texture: 'https://laozicloud-sdk.obs.cn-east-2.myhuaweicloud.com/assets/image/streamer2.png',
+            //     path: path
+            // }
+            // // 流光线
+            // let opt2 = {
+            //     color: '#ffff00', //颜色
+            //     radius: 6,  //半径
+            //     tension: 0.05, //平滑度
+            //     speed: 0.8,
+            //     texture: 'https://laozicloud-sdk.obs.cn-east-2.myhuaweicloud.com/assets/image/streamer2.png',
+            //     path: path2
+            // }
+            // // 流光线
+            // let opt3 = {
+            //     color: '#ffff00', //颜色
+            //     radius: 6,  //半径
+            //     tension: 0.05, //平滑度
+            //     speed: 0.8,
+            //     texture: 'https://laozicloud-sdk.obs.cn-east-2.myhuaweicloud.com/assets/image/streamer2.png',
+            //     path: path3
+            // }
+            // viewer.effectManager.addStreamerPath(opt1);
+            // viewer.effectManager.addStreamerPath(opt2);
+            // viewer.effectManager.addStreamerPath(opt3);
+
+        },
+        onComplete: () => {
+            setTimeout(() => {
+                setLoding(false);
+                console.log('加载结束')
+            }, 1000)
+        }
+    })
+ 
+    // 加载第二个模型
+    const model2 = viewer.loadModel('1831246938251595776', {
+        visible: false,
+        onLoad: () => {
+            const { position, target } = initView
+            viewer.controls.flyTo({
+                position, //目标位置
+                target, //目标看向点
+                time: 800, //飞行事件
+                complete: function () {
+                    // Qmsg.success('飞行结束')
+                }
+            })
+            // let pathEditorTool = viewer.basicEditor.pathEditorTool;
+            // pathEditorTool.addPathEditor(path);
+            // pathEditorTool.curPathEditor = null;
+        }
+    })
+    model2.visible = false
+    // 初始化自定义热点
+    addIcon([-184.870039309653, 3.965011795261355,-11.856367301596975], '../model/jb.png')
+    addIcon([-132.0984609220011, 11.85134977845181, -42.244397654942425], '../model/zk.png')
+    addIcon([-86.34709194511188, 5.493227074296121, 29.18628070414983], '../model/gy.png')
+    addIcon([9.763634417782407, 5.455718225036926, 29.503988562224794], '../model/gy2.png')
+    addIcon([-57.18874925354921, 3.3055837677420437, 149.51294098029445], '../model/cn.png')
+    addIcon([51.54293997598273, 3.196870702979882, 6.661827220283881], '../model/cn2.png')
+    addIcon([-29.109169371281638, -0.2424070537090219, 59.17100340353954], '../model/svg.png')
+    addIcon([-28.247203753025346, 5.836416404056854, 8.803015976276736], '../model/zb.png')
+    addIcon([-11.862188461691353, -0.24240705370899565, -58.98836199447743], '../model/bgx.png')
+    addIcon([-67.94633347061185, -0.24240705370904053, -20.75567919052935], '../model/330.png')
+    addIcon([-42.735614124788455, 3.268306521432214, 132.55412505726883], '../model/pint1.png', 'cn')
+    addIcon([-46.99420367347235, 6.836416404056854, 8.803015976276736], '../model/pint2.png', 'zb')
+    addIcon([-133.75930527088008, 5.965011795261355,-11.856367301596975], '../model/pint3.png', 'qxz')
+    addIcon([-46.263723948707714, 6.1187734650826508, 68.66213211586849], '../model/pint4.png', 'svg1')
+    addIcon([-46.263723948707714, 6.1187734650826508, 50.48085546867028], '../model/pint5.png', 'svg2')
+    addIcon([-157.87188173105585, 5.965011795261355,-11.856367301596975], '../model/pint6.png', 'zb1')
+    addIcon([-142.1374757990635, 8.48919716599255, -49.29269392084421], '../model/pint7.png', 'zb2')
+
+    // viewer.controls.enableZoom = false // 禁止缩放
+    // 功能函数
+    function setLoding(value) {
+        const loadingContainer = document.getElementById('loading');
+        loadingContainer.style.display = value? 'block': 'none'; // 隐藏加载动画
+        const mapContainer = document.getElementById('container');
+        mapContainer.style.opacity = value? '0': '1'; // 隐藏加载动画
+    }
+    let typeFly = null;
+    function fisetView(type) {
+        const objData = {
+            'qxz':  {
+                "position": [
+                    -250.543712341808,
+                    71.82585902978352,
+                    -141.6793806713266
+                ],
+                "target": [
+                    -86.1915488771483,
+                    13.484802866493055,
+                    1.1334230210668466
+                ]
+            },
+            'zb': {
+                "position": [
+                    108.77258795441088,
+                    142.64832100054355,
+                    -38.93946949679988
+                ],
+                "target": [
+                    -86.1915488771483,
+                    13.484802866493055,
+                    1.1334230210668466
+                ]
+            },
+            'svg1': {
+                "position": [
+                    58.57372114938684,
+                    76.42540249149998,
+                    178.2818446764054
+                ],
+                "target": [
+                    -86.1915488771483,
+                    13.484802866493055,
+                    1.1334230210668466
+                ]
+            },
+            'svg2': {
+                "position": [
+                    28.660007146404638,
+                    74.89644093311476,
+                    199.4710053672568
+                ],
+                "target": [
+                    -86.1915488771483,
+                    13.484802866493055,
+                    1.1334230210668466
+                ]
+            },
+               'cn': {
+                "position": [
+                    -24.357512425173482,
+                    72.93196558507324,
+                    214.2022776846194
+                ],
+                "target": [
+                    -86.1915488771483,
+                    13.484802866493055,
+                    1.1334230210668466
+                ]
+            },
+            'zb1': {
+                "position": [
+                    -297.7443349353266,
+                    74.89644093311459,
+                    -87.03740663923138
+                ],
+                "target": [
+                    -86.1915488771483,
+                    13.484802866493055,
+                    1.1334230210668466
+                ]
+            },
+            'zb2': {
+                "position": [
+                    -210.8274213715996,
+                    74.89644093311455,
+                    -191.2063174890771
+                ],
+                "target": [
+                    -86.1915488771483,
+                    13.484802866493055,
+                    1.1334230210668466
+                ]
+            }
+        }
+        const { position, target } = objData[type]
+        if (typeFly === type) {
+            // 类型与上一次相同，则不改变视角
+            return
+        }
+        if (type === 'zb1' || type === 'zb2' || type === 'cn') {
+            viewer.controls.setView(objData[type])
+            // console.log(objData[type], 'objData[type]')
+            viewer.threePersonControls.setView(objData[type]);
+            return
+        }
+        viewer.controls.flyTo({
+            position, //目标位置
+            target, //目标看向点
+            time: 500, //飞行事件
+            complete: function () {
+                typeFly = type
+                // Qmsg.success('飞行结束')
+            }
+        })
+    }
+
+    function addPop(position, type, idx) {
+        //addPop() 定义弹窗名称，弹窗数据
+        const objName = { 'qxz': '气象站', 'zb': '3#主变', 'cn': '储能仓', 'svg1': '7#SVG', 'svg2': '8#SVG', 'zb1': 'zb1', 'zb2': 'zb2' }
+        const domList = {
+            'qxz': [
+                { key: '总辐射', value: (formData.zsEnvMonitorCurrRmData.emHorGlobalRad ? Number(formData.zsEnvMonitorCurrRmData.emHorGlobalRad).toFixed(2) : 0) + 'W/m²' },
+                { key: "气压", value: (formData.zsEnvMonitorCurrRmData.emAtmPre ? Number(formData.zsEnvMonitorCurrRmData.emAtmPre).toFixed(2) : 0) + 'hPa' },
+                { key: "直接辐射", value: (formData.zsEnvMonitorCurrRmData.emHorDirRad ? Number(formData.zsEnvMonitorCurrRmData.emHorDirRad).toFixed(2) : 0) + 'W/m²' },
+                { key: "风速", value: (formData.zsEnvMonitorCurrRmData.emWindSpeed ? Number(formData.zsEnvMonitorCurrRmData.emWindSpeed).toFixed(2) : 0) + 'm/s' },
+                { key: "温度", value: (formData.zsEnvMonitorCurrRmData.emAmbTem ? Number(formData.zsEnvMonitorCurrRmData.emAmbTem).toFixed(2) : 0) + '℃' },
+                { key: "风向", value: formData.zsEnvMonitorCurrRmData.emWindDirection ? Number(formData.zsEnvMonitorCurrRmData.emWindDirection).toFixed(2) : 0 },
+                { key: "湿度", value: (formData.zsEnvMonitorCurrRmData.emAmbHum ? Number(formData.zsEnvMonitorCurrRmData.emAmbHum).toFixed(2) : 0) + '%' }],
+            'zb': [
+                { key: 'F(Hz)', value: formData.zbgy.mtRm7 ? Number(formData.zbgy.mtRm7).toFixed(2) : 0 },
+                { key: "CT变比", value: formData.zbgy.mtRm8 ? formData.zbgy.mtRm8 : 0 },
+                { key: "Ua（V）", value: formData.zbgy.mtRm1 ? Number(formData.zbgy.mtRm1).toFixed(2) : 0 },
+                { key: "la（A）", value: formData.zbgy.mtRm9 ? Number(formData.zbgy.mtRm9).toFixed(2) : 0 },
+                { key: "Ub（V）", value: formData.zbgy.mtRm2 ? Number(formData.zbgy.mtRm2).toFixed(2) : 0 },
+                { key: "lb（A）", value: formData.zbgy.mtRm10 ? Number(formData.zbgy.mtRm10).toFixed(2) : 0 },
+                { key: "Uc（V）", value: formData.zbgy.mtRm3 ? Number(formData.zbgy.mtRm3).toFixed(2) : 0 },
+                { key: "lc（A）", value: formData.zbgy.mtRm11 ? Number(formData.zbgy.mtRm11).toFixed(2) : 0 },
+                { key: "Uab1（V）", value: formData.zbgy.mtRm4 ? Number(formData.zbgy.mtRm4).toFixed(2) : 0 },
+                { key: "P（KW)", value: formData.zbgy.mtRm12 ? Number(formData.zbgy.mtRm12).toFixed(2) : 0 },
+                { key: "Ubc1（V）", value: formData.zbgy.mtRm5 ? Number(formData.zbgy.mtRm5).toFixed(2) : 0 },
+                { key: "Q (KVar)", value: formData.zbgy.mtRm13 ? Number(formData.zbgy.mtRm13).toFixed(2) : 0 },
+                { key: "Uca1（V）", value: formData.zbgy.mtRm6 ? Number(formData.zbgy.mtRm6).toFixed(2) : 0 },
+                { key: "COSφ", value: formData.zbgy.mtRm14 ? Number(formData.zbgy.mtRm14).toFixed(2) : 0 }],
+            'cn': [
+                { key: "la1(A)", value: formData.cnList[idx].pcsPaic1 ? Number(formData.cnList[idx].pcsPaic1).toFixed(2) : 0 },
+                { key: "la2(A)", value: formData.cnList[idx].pcsPaic2 ? Number(formData.cnList[idx].pcsPaic2).toFixed(2) : 0 },
+                { key: "P1(KW)", value: formData.cnList[idx].pcsAcAp1 ? Number(formData.cnList[idx].pcsAcAp1).toFixed(2) : 0 },
+                { key: "P2(KW)", value: formData.cnList[idx].pcsAcAp2 ? Number(formData.cnList[idx].pcsAcAp2).toFixed(2) : 0 },
+                { key: "Q1(KVar)", value: formData.cnList[idx].pcsAcRp1 ? Number(formData.cnList[idx].pcsAcRp1).toFixed(2) : 0 },
+                { key: "Q2(KVar)", value: formData.cnList[idx].pcsAcRp2 ? Number(formData.cnList[idx].pcsAcRp2).toFixed(2) : 0 },
+                { key: "SOC1(%)", value: formData.cnList[idx].soc1 ? Number(formData.cnList[idx].soc1).toFixed(2) : 0 },
+                { key: "SOC2(%)", value: formData.cnList[idx].soc2 ? Number(formData.cnList[idx].soc2).toFixed(2) : 0 }],
+            'svg1': [
+                { key: 'F(Hz)', value: formData.svg1.svgRm7 ? Number(formData.svg1.svgRm7).toFixed(2) : 0 },
+                { key: "CT变比", value: formData.svg1.svgRm8 ? formData.svg1.svgRm8 : 0 },
+                { key: "Ua（V）", value: formData.svg1.svgRm1 ? Number(formData.svg1.svgRm1).toFixed(2) : 0 },
+                { key: "la（A）", value: formData.svg1.svgRm9 ? Number(formData.svg1.svgRm9).toFixed(2) : 0 },
+                { key: "Ub（V）", value: formData.svg1.svgRm2 ? Number(formData.svg1.svgRm2).toFixed(2) : 0 },
+                { key: "lb（A）", value: formData.svg1.svgRm10 ? Number(formData.svg1.svgRm10).toFixed(2) : 0 },
+                { key: "Uc（V）", value: formData.svg1.svgRm3 ? Number(formData.svg1.svgRm3).toFixed(2) : 0 },
+                { key: "lc（A）", value: formData.svg1.svgRm11 ? Number(formData.svg1.svgRm11).toFixed(2) : 0 },
+                { key: "Uab1（V）", value: formData.svg1.svgRm4 ? Number(formData.svg1.svgRm4).toFixed(2) : 0 },
+                { key: "P（KW)", value: formData.svg1.svgRm12 ? Number(formData.svg1.svgRm12).toFixed(2) : 0 },
+                { key: "Ubc1（V）", value: formData.svg1.svgRm5 ? Number(formData.svg1.svgRm5).toFixed(2) : 0 },
+                { key: "Q (KVar)", value: formData.svg1.svgRm13 ? Number(formData.svg1.svgRm13).toFixed(2) : 0 },
+                { key: "Uca1（V）", value: formData.svg1.svgRm6 ? Number(formData.svg1.svgRm6).toFixed(2) : 0 },
+                { key: "COSφ", value: formData.svg1.svgRm14 ? Number(formData.svg1.svgRm14).toFixed(2) : 0 }],
+            'svg2': [
+                { key: 'F(Hz)', value: formData.svg2.svgRm7 ? Number(formData.svg2.svgRm7).toFixed(2) : 0 },
+                { key: "CT变比", value: formData.svg2.svgRm8 ? formData.svg2.svgRm8 : 0 },
+                { key: "Ua（V）", value: formData.svg2.svgRm1 ? Number(formData.svg2.svgRm1).toFixed(2) : 0 },
+                { key: "la（A）", value: formData.svg2.svgRm9 ? Number(formData.svg2.svgRm9).toFixed(2) : 0 },
+                { key: "Ub（V）", value: formData.svg2.svgRm2 ? Number(formData.svg2.svgRm2).toFixed(2) : 0 },
+                { key: "lb（A）", value: formData.svg2.svgRm10 ? Number(formData.svg2.svgRm10).toFixed(2) : 0 },
+                { key: "Uc（V）", value: formData.svg2.svgRm3 ? Number(formData.svg2.svgRm3).toFixed(2) : 0 },
+                { key: "lc（A）", value: formData.svg2.svgRm11 ? Number(formData.svg2.svgRm11).toFixed(2) : 0 },
+                { key: "Uab1（V）", value: formData.svg2.svgRm4 ? Number(formData.svg2.svgRm4).toFixed(2) : 0 },
+                { key: "P（KW)", value: formData.svg2.svgRm12 ? Number(formData.svg2.svgRm12).toFixed(2) : 0 },
+                { key: "Ubc1（V）", value: formData.svg2.svgRm5 ? Number(formData.svg2.svgRm5).toFixed(2) : 0 },
+                { key: "Q (KVar)", value: formData.svg2.svgRm13 ? Number(formData.svg2.svgRm13).toFixed(2) : 0 },
+                { key: "Uca1（V）", value: formData.svg2.svgRm6 ? Number(formData.svg2.svgRm6).toFixed(2) : 0 },
+                { key: "COSφ", value: formData.svg2.svgRm14 ? Number(formData.svg2.svgRm14).toFixed(2) : 0 }],
+        }
+
+        //通过CSS重写.hot-spot类实现自定义文字样式
+        fisetView(type) // 飞行到对应视角
+        const hostP = [] // 弹窗点位经纬度 整体抬高15px
+        position.forEach((item, index) => {
+            if (index === 1) {
+                if (type === 'zb1' || type === 'zb2') {
+                    item = item + 10
+                } else {
+                    item = item + 15
+                }
+            }
+            hostP.push(item)
+        })
+
+
+        // 弹窗外框
+        const element = document.createElement('div')
+        element.className = objName[type] === 'zb1' || objName[type] === 'zb2' ? 'custom-max' : (type === 'cn' || type === 'qxz' ? 'custom-min' : 'custom')
+        // 弹窗标题
+        const childDiv = document.createElement('div');
+        childDiv.className = 'custom-title'
+        echartDomId = type === 'zb1' || type === 'zb2' ? (type === 'zb1' ? 'rf' : 'gl') : null
+        childDiv.innerText = objName[type] === 'zb1' || objName[type] === 'zb2' ? (echartDomId === 'rf' ? '日发电量预测图' : 'AGC功率曲线') : objName[type]
+        element.appendChild(childDiv);
+        // 弹窗控件
+        //储能弹窗下拉
+        if (type === 'cn') {
+            const childSelect = document.createElement('select');
+            childSelect.className = 'custom-select'
+            // childSelect.innerText = objName[type]
+            formData.cnList.forEach((item, index) => {
+                const option = document.createElement("option");
+                option.className = 'custom-option'
+                option.value = index;
+                option.textContent = (index + 1) + '号储能'; // 标准浏览器支持
+                childSelect.appendChild(option);
+            })
+            childSelect.value = idx
+            childSelect.addEventListener('change', function (event) {
+                addPop([-58.68227971666203, 1594.3391435766625, -159.77171499597307], 'cn', event.target.value)
+                console.log('选中的值：', event.target.value);
+            });
+            element.appendChild(childSelect);
+        }
+
+        indexNext = 0
+        if (type === 'zb1' || type === "zb2") {
+            const leftNext = document.createElement('span')
+            leftNext.className = 'left-next'
+            leftNext.innerText = '<'
+            element.appendChild(leftNext)
+            leftNext.addEventListener('click', function () {
+                onleftNext(type, element)
+            });
+            const rightNext = document.createElement('span')
+            rightNext.className = 'right-next'
+            rightNext.innerText = '>'
+            element.appendChild(rightNext)
+            rightNext.addEventListener('click', function () {
+                onrightNext(type, element)
+            });
+        }
+
+        // 弹窗内容部分
+        if (domList[type]) {
+            // 普通弹窗
+            domList[type].forEach((item, index) => {
+                if (index % 2 === 0) {
+                    const childDiv1 = document.createElement('div');
+                    childDiv1.className = 'custom-sp1'
+                    childDiv1.innerHTML = `<span>${item.key}</span><span>${item.value}</span>`;
+                    element.appendChild(childDiv1);
+                } else {
+                    const childDiv2 = document.createElement('div');
+                    childDiv2.className = 'custom-sp2'
+                    childDiv2.innerHTML = `<span>${item.key}</span><span>${item.value}</span>`;
+                    element.appendChild(childDiv2);
+
+                }
+            })
+        } else {
+            console.log(echartDomId, 'echartDomId')
+            let chartDom = document.getElementById(echartDomId);
+            chartDom.style.display = 'block'
+            element.appendChild(chartDom);
+        }
+
+        // 老子云弹窗图层要素清空，以及二次加载
+        if (hotspots && hotspots.length > 0) {
+            console.log(oldDomId, '历史domid')
+            // 清空其他数据
+            delPop(type)
+        }
+        // 保存历史domid,下次清空时需要
+        if (domList[type]) {
+            oldDomId = null
+        } else {
+            oldDomId = echartDomId
+        }
+        let hotspot = viewer.hotSpotManager.add({
+            userData: { type },
+            position: hostP,
+            cameraView: viewer.controls.getView(),
+            element,
+            arrt: '1',
+            layer: layer_div   //传入图层 layer_div 后，该热点创建完成后会被放入到图层 layer_div
+        })
+        hotspots.push(hotspot)
+        viewer.container.onclick = null
+        if (domList[type]) {
+            return
+        }
+    }
+    // 清空弹窗数据
+    async function delPop(type) {
+        if (oldDomId) {
+            // 有oldDomId 则需要先移除echartsdom ,再清空弹窗dom
+            let oldDom = document.getElementById(oldDomId);
+            console.log(oldDomId)
+            let customDom = document.getElementsByClassName('custom-max')
+            customDom[0].style.display = 'none'
+            if (oldDom) {
+                oldDom.style.display = 'none'
+                document.body.appendChild(oldDom)
+            }
+        }
+        // 清空弹窗dom
+        layer_div.removeAll()
+        hotspots = []
+        if (type) return
+
+        const { position, target } = initView
+        viewer.controls.flyTo({
+            position, //目标位置
+            target, //目标看向点
+            time: 800, //飞行事件
+            complete: function () {
+                // Qmsg.success('飞行结束')
+            }
+        })
+    }
+    // 添加 扩散热点
+    function addTours(point, color) {
+        // 闪烁效果
+        let tours;
+        // 颜色，速度，开始半径，结束半径
+        let toursSpeed = 2.2, toursStartRadius = 0.025, toursEndRadius = 0.1;
+        let s = {
+            startRadius: toursStartRadius,
+            color: color,
+            endRadius: toursEndRadius,
+            speed: toursSpeed,
+        }
+        tours = viewer.effectManager.addToursScanning(s);
+        tours.position.set(
+            point[0],
+            point[1],
+            point[2]
+        );
+
+        tours.scale.set(100, 100, 100)
+        toursList.push(tours)
+    }
+    // 添加巡检动效:扩散热点
+    function addPatrolTours(point, name) {
+        let { position, target } = point
+        // 闪烁效果
+        let tours;
+        // 颜色，速度，开始半径，结束半径
+        let toursSpeed = 1.5, toursStartRadius = 0.02, toursEndRadius = 0.05;
+        let s = {
+            startRadius: toursStartRadius,
+            color: '#FF7F50',
+            endRadius: toursEndRadius,
+            speed: toursSpeed,
+        }
+        tours = viewer.effectManager.addToursScanning(s);
+        tours.position.set(
+            position[0],
+            position[1],
+            position[2]
+        );
+        tours.visible = false
+        tours.scale.set(100, 100, 100)
+        patrolToursList.push({ tours: tours, point: point })
+    }
+    function flytoCan(position, target, name) {
+        viewer.controls.flyTo({
+            position, //目标位置
+            target, //目标看向点
+            time: 800, //飞行事件
+            complete: function () {
+                // Qmsg.success('飞行结束')
+            }
+        })
+
+    }
+
+    // 添加图标点.带name的点为有弹窗图标点
+    function addIcon(point, img, name) {
+        //自定义 icon 地址
+        viewer.hotSpotManager.icon = img
+        viewer.hotSpotManager.addMarker({
+            position: point, //热点放置位置(必填)
+            layer: name ? layer_icon : layer_title, // 
+            onclick: name ? () => addPop(point, name, 0) : null //点击后需要执行的回调(可选)
+        })
+        viewer.container.onclick = null
+    }
+
+    // echarts柱状图 
+    function echartsrf() {
+        console.log('echarts', formData.powerInfoForFifDays, '功率预测日发')
+        if (formData.powerInfoForFifDays && formData.powerInfoForFifDays.length === 0) {
+            return
+        }
+        let chartDom = document.getElementById('rf');
+        let myChart = echarts.init(chartDom);
+        const obj = formData.powerInfoForFifDays[0]
+        const dimensions = []
+        const source = []
+        formData.powerInfoForFifDays.forEach(item => {
+            source.push({ 'dataDate': item.dataDate, '预测发电量（万kwh）': item.predictPower, '实际发电量（万kwh）': item.realPower })
+        })
+        for (let key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                if (key === 'predictPower') {
+                    key = '预测发电量（万kwh）'
+                }
+                if (key === 'realPower') {
+                    key = '实际发电量（万kwh）'
+                }
+                dimensions.push(key)
+            }
+        }
+        option = {
+            legend: {
+                textStyle: {
+                    color: '#fff', // 字体颜色
+                    fontSize: 10,  // 字体大小
+                    fontFamily: 'Arial' // 字体类型
+                },
+            },
+            tooltip: {},
+            grid: {
+                left: '8%',
+                right: '8%',
+                bottom: '12%',
+                containLabel: true
+            },
+            dataset: {
+                dimensions,
+                source
+            },
+            xAxis: {
+                axisLabel: {
+                    color: '#fff' // 设置 x 轴刻度文本的颜色为蓝色
+                },
+                type: 'category'
+            },
+            yAxis: {
+                axisLabel: {
+                    color: '#fff' // 这里设置为红色
+                }
+            },
+            series: [{ type: 'bar' }, { type: 'bar' }]
+        };
+
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+    }    // echarts柱状图 
+    function echartsyf() {
+        console.log('echarts', formData.powerInfoForMonth, '功率预测月发')
+        if (formData.powerInfoForMonth && formData.powerInfoForMonth.length === 0) {
+            return
+        }
+        let chartDom = document.getElementById('yf');
+        let myChart = echarts.init(chartDom);
+        const obj = formData.powerInfoForMonth[0]
+        const dimensions = []
+        const source = []
+        formData.powerInfoForMonth.forEach(item => {
+            source.push({ 'dataDate': item.dataDate, '预测发电量（万kwh）': item.predictPower, '实际发电量（万kwh）': item.realPower })
+        })
+        for (let key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                if (key === 'predictPower') {
+                    key = '预测发电量（万kwh）'
+                }
+                if (key === 'realPower') {
+                    key = '实际发电量（万kwh）'
+                }
+                if (key !== 'dataNumberDate') {
+
+                    dimensions.push(key)
+                }
+            }
+        }
+        option = {
+            legend: {
+                textStyle: {
+                    color: '#fff', // 字体颜色
+                    fontSize: 10,  // 字体大小
+                    fontFamily: 'Arial' // 字体类型
+                },
+            },
+            tooltip: {},
+            grid: {
+                left: '8%',
+                right: '8%',
+                bottom: '12%',
+                containLabel: true
+            },
+            dataset: {
+                dimensions,
+                source
+            },
+            xAxis: {
+                axisLabel: {
+                    color: '#fff' // 设置 x 轴刻度文本的颜色为蓝色
+                },
+                type: 'category'
+            },
+            yAxis: {
+                axisLabel: {
+                    color: '#fff' // 这里设置为红色
+                }
+            },
+            series: [{ type: 'bar' }, { type: 'bar' }]
+        };
+
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+    }
+    async function echartsjr() {
+        let chartDom = document.getElementById('jr');
+        console.log('echarts', formData.powerPredictInfos, '功率预测')
+        const objKye = []
+        const objValue = []
+        let yData = []
+        for (let key in formData.powerPredictInfos) {
+            if (formData.powerPredictInfos.hasOwnProperty(key)) {
+                const value = []
+                await formData.powerPredictInfos[key].length && formData.powerPredictInfos[key].forEach(ite => {
+                    value.push(ite.dataValue)
+                })
+                objKye.push(key)
+                objValue.push(formData.powerPredictInfos[key])
+                yData.push({
+                    name: key,
+                    symbol: 'none',
+                    type: 'line',
+                    // stack: 'Total',
+                    data: value
+                })
+            }
+        }
+        // x轴时间段
+        let xData = [] // 合并所有日期再去重
+        const time = []
+        objValue.forEach(item => {
+            if (item && item.length > 0) {
+                item.forEach(ite => {
+                    time.push(ite.dataTime)
+                })
+            }
+        })
+        xData = [...new Set(time)]
+        let myChart = echarts.init(chartDom);
+        option = {
+            tooltip: {
+                trigger: 'axis'
+            },
+            legend: {
+                textStyle: {
+                    color: '#fff', // 字体颜色
+                    fontSize: 10,  // 字体大小
+                    fontFamily: 'Arial' // 字体类型
+                },
+                data: objKye
+            },
+            grid: {
+                left: '8%',
+                right: '8%',
+                bottom: '12%',
+                containLabel: true
+            },
+            xAxis: {
+                axisLabel: {
+                    color: '#fff' // 设置 x 轴刻度文本的颜色为蓝色
+                },
+                type: 'category',
+                boundaryGap: false,
+                data: xData
+            },
+            yAxis: {
+                axisLabel: {
+                    color: '#fff' // 这里设置为红色
+                },
+                type: 'value'
+            },
+            series: yData
+        };
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+    }
+    async function echartsgl() {
+        let chartDom = document.getElementById('gl');
+        let yData1 = [0, 0, 0], yData2 = [0, 0, 0], yData3 = [0, 0, 0] // Y轴数据
+        // x轴时间段
+        let xData = []
+        if (formData.agcAvcPowerCurve && formData.agcAvcPowerCurve.length > 0) {
+            yData1 = []
+            yData2 = []
+            yData3 = []
+            // 获取数据key和value
+            await formData.agcAvcPowerCurve.forEach(async (item) => {
+                yData1.push(item.acTap)
+                yData2.push(item.acRtap)
+                yData3.push(item.acPtp)
+                xData.push(item.dataTime)
+            })
+        }
+        let myChart = echarts.init(chartDom);
+        option = {
+            tooltip: {
+                trigger: 'axis'
+            },
+            legend: {
+                textStyle: {
+                    color: '#fff', // 字体颜色
+                    fontSize: 10,  // 字体大小
+                    fontFamily: 'Arial' // 字体类型
+                },
+                data: ['目标有功功率(kw)', '实时有功功率(kw)', '预测理论功率(kw)']
+            },
+            grid: {
+                left: '8%',
+                right: '8%',
+                bottom: '12%',
+                containLabel: true
+            },
+            toolbox: {
+                feature: {
+                    saveAsImage: {}
+                }
+            },
+            xAxis: {
+                axisLabel: {
+                    color: '#fff' // 设置 x 轴刻度文本的颜色为蓝色
+                },
+                type: 'category',
+                boundaryGap: false,
+                data: xData
+            },
+            yAxis: {
+                axisLabel: {
+                    color: '#fff' // 这里设置为红色
+                },
+                type: 'value'
+            },
+            series: [
+                {
+                    name: '目标有功功率(kw)',
+                    type: 'line',
+                    symbol: 'none',
+                    // stack: 'Total',
+                    data: yData1
+                },
+                {
+                    name: '预测理论功率(kw)',
+                    type: 'line',
+                    symbol: 'none',
+                    // stack: 'Total',
+                    data: yData3
+                },
+                {
+                    name: '实时有功功率(kw)',
+                    type: 'line',
+                    symbol: 'none',
+                    // stack: 'Total',
+                    data: yData2
+                }
+            ]
+        };
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+    }
+    async function echartsdy() {
+        let chartDom = document.getElementById('dy');
+        let yData1 = [0, 0, 0], yData2 = [0, 0, 0], yData3 = [0, 0, 0] // Y轴数据
+        // x轴时间段
+        let xData = []
+
+        if (formData.agcAvcVoltageCurve && formData.agcAvcVoltageCurve.length > 0) {
+            yData1 = []
+            yData2 = []
+            yData3 = []
+            // 获取数据key和value
+            await formData.agcAvcVoltageCurve.forEach(async (item) => {
+                yData1.push(item.acRtgcv)
+                yData2.push(item.acRtvogc)
+                yData3.push(item.acTv)
+                xData.push(item.dataTime)
+            })
+        }
+        let myChart = echarts.init(chartDom);
+        option = {
+            tooltip: {
+                trigger: 'axis'
+            },
+            legend: {
+                textStyle: {
+                    color: '#fff', // 字体颜色
+                    fontSize: 10,  // 字体大小
+                    fontFamily: 'Arial' // 字体类型
+                },
+                data: ['并网实时电压(v)', '并网无功实时电压(v)', '目标电压(v)']
+            },
+            grid: {
+                left: '8%',
+                right: '8%',
+                bottom: '12%',
+                containLabel: true
+            },
+            toolbox: {
+                feature: {
+                    saveAsImage: {}
+                }
+            },
+            xAxis: {
+                axisLabel: {
+                    color: '#fff' // 设置 x 轴刻度文本的颜色为蓝色
+                },
+                type: 'category',
+                boundaryGap: false,
+                data: xData
+            },
+            yAxis: {
+                axisLabel: {
+                    color: '#fff' // 这里设置为红色
+                },
+                type: 'value'
+            },
+            series: [
+                {
+                    name: '并网实时电压(v)',
+                    type: 'line',
+                    symbol: 'none',
+                    // stack: 'Total',
+                    data: yData1
+                },
+                {
+                    name: '并网无功实时电压(v)',
+                    type: 'line',
+                    symbol: 'none',
+                    // stack: 'Total',
+                    data: yData2
+                },
+                {
+                    name: '目标电压(v)',
+                    type: 'line',
+                    symbol: 'none',
+                    // stack: 'Total',
+                    data: yData3
+                }
+            ]
+        };
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+    }
+
+    function onleftNext(type, element) {
+        if (indexNext === 0) {
+            return
+        }
+        indexNext = indexNext - 1
+        if (type === 'zb1') {
+            const zb1List = ['rf', 'yf', 'jr']
+            const titleList = { 'rf': '日发电量预测图', 'yf': '月发电量预测图', 'jr': '功率预测' }
+            echartDomId = zb1List[indexNext]
+            const textDom = document.getElementsByClassName('custom-title')
+            textDom[0].innerText = titleList[echartDomId]
+        } else {
+            const zb2List = ['gl', 'dy']
+            const titleList = { 'gl': 'AGC功率曲线', 'dy': 'AVC电压曲线' }
+            echartDomId = zb2List[indexNext]
+            const textDom = document.getElementsByClassName('custom-title')
+            textDom[0].innerText = titleList[echartDomId]
+        }
+        // 操作图表dom
+        if (oldDomId) {
+            // 有oldDomId 则需要先移除echartsdom ,再清空弹窗dom
+            let oldDom = document.getElementById(oldDomId);
+            oldDom.style.display = 'none'
+            document.body.appendChild(oldDom)
+
+            let chartDom = document.getElementById(echartDomId);
+            chartDom.style.display = 'block'
+            element.appendChild(chartDom);
+        }
+        oldDomId = echartDomId
+    }
+
+    function onrightNext(type, element) {
+        if (type === 'zb1') {
+            if (indexNext === 2) {
+                return
+            }
+            indexNext = indexNext + 1
+            const zb1List = ['rf', 'yf', 'jr']
+            const titleList = { 'rf': '日发电量预测图', 'yf': '月发电量预测图', 'jr': '功率预测' }
+            echartDomId = zb1List[indexNext]
+            const textDom = document.getElementsByClassName('custom-title')
+            textDom[0].innerText = titleList[echartDomId]
+        } else {
+            if (indexNext === 1) {
+                return
+            }
+            indexNext = indexNext + 1
+            const zb2List = ['gl', 'dy']
+            const titleList = { 'gl': 'AGC功率曲线', 'dy': 'AVC电压曲线' }
+            echartDomId = zb2List[indexNext]
+            const textDom = document.getElementsByClassName('custom-title')
+            textDom[0].innerText = titleList[echartDomId]
+        }
+        // 操作图表dom
+        if (oldDomId) {
+            // 有oldDomId 则需要先移除echartsdom ,再清空弹窗dom
+            let oldDom = document.getElementById(oldDomId);
+            oldDom.style.display = 'none'
+            document.body.appendChild(oldDom)
+
+            let chartDom = document.getElementById(echartDomId);
+            chartDom.style.display = 'block'
+            element.appendChild(chartDom);
+        }
+        oldDomId = echartDomId
+    }
+    // 开启
+    function btn() {
+        if (timeNum) {
+            // 防止漫游状态下操作
+            alert('请先结束漫游状态')
+            return
+        }
+        toursList.forEach(item => {
+            item.visible = false
+        })
+        patrolToursList.forEach(item => {
+            const element = document.createElement('div')
+            element.innerHTML = '隐藏点位按钮'
+            element.style.width = '50px'
+            element.style.color = '#f00'
+            element.style.opacity = 0
+            element.style.cursor = 'pointer'
+            viewer.hotSpotManager.add({
+                position: item.point.position, //热点放置位置(必填)
+                element: element, //需要添加的文字(必填)
+                layer: layer_btn,
+                onclick: () => flytoCan(item.point.position, item.point.target, name) //点击后需要执行的回调(可选)
+            })
+            item.tours.visible = true
+        })
+        layer_icon.visible = false
+        const { position, target } = {
+            "position": [
+                -93.6115413028,
+                113.24042279982214,
+                -130.0637355262395
+            ],
+            "target": [
+                -95.16204399671959,
+                -23.201198800342787,
+                -7.220708542468465
+            ]
+        }
+        timeNum = 1
+        viewer.controls.flyTo({
+            position, //目标位置
+            target, //目标看向点
+            time: 900, //飞行事件
+            complete: function () {
+                // Qmsg.success('飞行结束')
+            }
+        })
+    }
+    // 开启
+    function btn1() {
+        if (timeNum === 1) {
+            // 防止漫游状态下操作
+            alert('请先结束定点漫游状态')
+            return
+        }
+        model2.visible = false
+        runModel = viewer.camera;
+        move();
+        timeNum = 26000;
+        setTimeout(function () {
+            btn2()
+        }, 130000); // 5000毫秒后执行
+        // runModel = viewer.camera;
+    }
+    // 关闭
+    function btn2() {
+        toursList.forEach(item => {
+            item.visible = true
+        })
+        layer_icon.visible = true
+        patrolToursList.forEach(item => {
+            item.tours.visible = false
+        })
+        viewer.effectManager.viewer.isViewer = true
+        if (timeNum === null) {
+            return
+        }
+
+        layer_btn && layer_btn.removeAll()
+        pathTween && pathTween.stop();
+
+        const { position, target } = initView
+        viewer.controls.flyTo({
+            position, //目标位置
+            target, //目标看向点
+            time: 800, //飞行事件
+            complete: function () {
+                // Qmsg.success('飞行结束')
+            }
+        })
+        timeNum = null
+    }
+    function move() {
+        let movePath = path;
+        pathTween = new AMRT.PathTween();
+        pathTween.model = runModel; // 模型对象
+        // pathTween.rotate = { x: rotateX * Math.PI / 180, y: rotateY * Math.PI / 180, z: rotateZ * Math.PI / 180 };
+        pathTween.path = movePath;
+        pathTween.time = time * 9000;
+        pathTween.loop = loopCount;
+        pathTween.tension = tension;
+        pathTween.loopType = loopType;
+        pathTween.color = "#fff"
+        pathTween.begin();
+    }
+    // 点击事件
+    viewer.container.addEventListener('click', e => {
+        //通过鼠标拾取模型对象
+        var object = viewer.picker.intersectObject(e)
+        if (object) {
+            //三维坐标转二维（屏幕坐标）
+            const v2 = viewer.picker.vectorToScreen(object.point)
+            // //设置视角，该数据可以通过 viewer.controls.getView 方法获得
+            console.log(viewer.controls.getView(), '位置')
+            console.log(object.point, '视角', object)
+            //将图标放置在对应位置上
+            // document.querySelector('#icon').style.left = v2.x + 'px'
+            // document.querySelector('#icon').style.top = v2.y + 'px'
+        }
+    })
+    viewer.container.addEventListener('dblclick', e => {
+        //通过鼠标拾取模型对象
+        var object = viewer.picker.intersectObject(e)
+        if (object) {
+            //三维坐标转二维（屏幕坐标）
+            const v2 = viewer.picker.vectorToScreen(object.point)
+            delPop()
+        }
+    })
+    window.addEventListener('message', function (event) {
+        console.log(event, '父级数据')
+        // // 处理接收到的数据
+        formData = event.data
+
+        echartsrf()
+        echartsyf()
+        echartsjr()
+        echartsgl()
+        echartsdy()
+        // 确保消息来源是可信的
+        // if (event.origin ===  window.location.origin) {
+        // }
+    }, false);
+    document.addEventListener('keydown', function (event) {
+        // 检查按键是否为 A，并且 Ctrl 键是否被按下
+        if (event.key === 'a' || event.key === 'Control' && (event.ctrlKey || event.metaKey)) {
+            // 阻止默认行为，即防止文本框内的内容被全选
+            event.preventDefault();
+        }
+    });
+
+</script>
+<style>
+    .custom {
+        /* background-color: rgba(48, 84, 91, 0.7); */
+        opacity: 0.8;
+        background: linear-gradient(45deg, #fff, #30545B 60%, #fff);
+        background: url('../model/bag.png') no-repeat;
+        color: #fff;
+        width: 20rem;
+        background-size: 20rem;
+        text-align: center;
+        padding: 10px 0 10px;
+        border-radius: 15px;
+        text-align: left;
+        -moz-user-select: none;
+        /* Safari 和 欧朋 */
+        -webkit-user-select: none;
+        /* IE10+ and Edge */
+        -ms-user-select: none;
+        /* Standard syntax 标准语法(谷歌) */
+        user-select: none;
+    }
+
+    .custom-min {
+        /* background-color: rgba(48, 84, 91, 0.7); */
+        opacity: 0.8;
+        background: linear-gradient(45deg, #fff, #30545B 60%, #fff);
+        background: url('../model/bag1.png') no-repeat;
+        color: #fff;
+        width: 20rem;
+        background-size: 20rem 15.5rem;
+        text-align: center;
+        padding: 10px 0 10px;
+        border-radius: 15px;
+        text-align: left;
+        -moz-user-select: none;
+        /* Safari 和 欧朋 */
+        -webkit-user-select: none;
+        /* IE10+ and Edge */
+        -ms-user-select: none;
+        /* Standard syntax 标准语法(谷歌) */
+        user-select: none;
+    }
+
+    .custom-max {
+        opacity: 1;
+        background: linear-gradient(45deg, #fff, #30545B 60%, #fff);
+        background: url('../model/bag2.png') no-repeat;
+        color: #fff;
+        width: 27rem;
+        background-size: 27rem 20.8rem;
+        text-align: center;
+        padding: 10px 0 10px;
+        border-radius: 15px;
+        text-align: left;
+        -moz-user-select: none;
+        /* Safari 和 欧朋 */
+        -webkit-user-select: none;
+        /* IE10+ and Edge */
+        -ms-user-select: none;
+        /* Standard syntax 标准语法(谷歌) */
+        user-select: none;
+    }
+
+    .custom-title {
+        text-align: left;
+        padding: 6px 0;
+        font-weight: 700;
+        margin-left: 60px;
+        font-size: 0.8rem;
+        margin-bottom: 1.4rem;
+    }
+
+    .custom-max .custom-title {
+        margin-bottom: 1.5rem;
+        padding: 6px 20px;
+    }
+
+    .remove-class {
+        display: none !important;
+        top: 0 !important;
+    }
+
+    .custom-echarts {
+        width: 27rem;
+        height: 14.5rem;
+        display: block !important;
+        top: 30px !important;
+    }
+
+    .custom-select {
+        position: absolute;
+        z-index: 60;
+        right: 15px;
+        top: 22px;
+    }
+
+    .custom-select {
+        border-radius: 4px;
+        background: #145468;
+        color: #fff;
+        border: 1px solid #145468;
+        padding: 2px;
+        font-size: 12px;
+    }
+
+    .custom-select option {
+        background: #145468;
+        color: #fff;
+        max-height: 14.5rem;
+        /* 设置最大高度 */
+        overflow-y: auto;
+        -webkit-appearance: none;
+        /* 移除默认样式 */
+        -moz-appearance: none;
+        /* 移除默认样式 */
+        appearance: none;
+        /* 移除默认样式 */
+        /* 使用自定义滚动条 */
+    }
+
+    .custom-select::-webkit-scrollbar {
+        width: 3px;
+        background-color: #145468;
+    }
+
+    /* 定制滚动条滑块 */
+    .custom-select::-webkit-scrollbar-thumb {
+        background-color: #f135;
+        border-radius: 6px;
+    }
+
+    /* 定制滚动条轨道内的滑块hover效果 */
+    .custom-select::-webkit-scrollbar-thumb:hover {
+        background-color: #a1a1a1;
+    }
+
+    .left-next {
+        position: absolute;
+        z-index: 99;
+        left: 15px;
+        top: 55%;
+        font-size: 1.2rem;
+    }
+
+    .right-next {
+        position: absolute;
+        z-index: 99;
+        right: 15px;
+        top: 55%;
+        font-size: 1.2rem;
+    }
+
+    .custom-sp1,
+    .custom-sp2 {
+        display: inline-flex;
+        width: 120px;
+        font-weight: 500;
+        font-size: 11px;
+        justify-content: space-between;
+        padding: 6px 20px;
+    }
+
+    #markerContainer img {
+        transform: scale(0.8);
+    }
+    /* styles.css */
+/* .loding-body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+} */
+body {
+    background-color: #000;
+}
+#loading-container {
+    display: block   ; /* 初始状态隐藏 */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0);
+    margin-top: -25px;
+    margin-left: -25px;
+    width: 100%;
+    text-align: center;
+    /* justify-content: center;
+    align-items: center;
+    flex-wrap: wrap; */
+}
+.loading {
+    height: 100%;
+    width: 100%;
+}
+.loader {
+    margin-left: 10px;
+    border: 14px solid rgba(255,255,255,0.2); /* Light grey */
+    border-top: 14px solid #3498db; /* Blue */
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 2s linear infinite;
+}
+.text {
+    height: 20px;
+    color: #3498db; /* Blue */
+    text-align: left;
+    padding-top: 10px;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+</style>

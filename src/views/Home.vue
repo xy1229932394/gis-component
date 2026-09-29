@@ -46,6 +46,17 @@
             </div>
             <el-icon class="menu-arrow" color="#909399"><ArrowRight /></el-icon>
           </div>
+
+          <div class="menu-item" @click="goTo('/amap-model-preview')">
+            <div class="menu-icon">
+              <el-icon :size="30" color="#e6a23c"><Box /></el-icon>
+            </div>
+            <div class="menu-info">
+              <div class="menu-name">3D模型</div>
+              <div class="menu-desc">古浪电站与中赢风电场老子云3D模型沉浸式展示</div>
+            </div>
+            <el-icon class="menu-arrow" color="#909399"><ArrowRight /></el-icon>
+          </div>
         </div>
       </div>
     </el-card>
@@ -55,7 +66,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Connection, Location, MapLocation } from '@element-plus/icons-vue'
+import { ArrowRight, Box, Connection, Location, MapLocation } from '@element-plus/icons-vue'
 
 const router = useRouter()
 

@@ -31,6 +31,11 @@ const routes: RouteRecordRaw[] = [
     path: '/amap-scatter-preview',
     name: 'AmapScatterPreview',
     component: () => import('@/views/GisScatter/AmapScatter.vue')
+  },
+  {
+    path: '/amap-model-preview',
+    name: 'AmapModelPreview',
+    component: () => import('@/views/GisModel/ModelPreview.vue')
   }
 ]
 
