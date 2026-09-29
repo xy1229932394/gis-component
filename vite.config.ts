@@ -4,9 +4,12 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { resolve } from 'path'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 export default defineConfig({
   plugins: [
     vue(),
+    cloudflare(),
     Components({
       resolvers: [ElementPlusResolver()],
       dts: false
