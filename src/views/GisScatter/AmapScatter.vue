@@ -64,7 +64,7 @@ const typeIconMap: Record<string, string> = {
 }
 
 let map: any = null
-let markers: any[] = []
+let cluster: any = null
 let infoWindow: any = null
 let mockData: AssetMarker[] = []
 let powerStationData: PowerStationMarker[] = []
@@ -235,18 +235,26 @@ const showInfoWindow = (dataItem: MarkerItem) => {
   infoWindow.open(map, dataItem.location)
 }
 
+const createClusterMarkerContent = (count: number): string => {
+  const ring = count >= 100 ? 'large' : 'normal'
+  const base = count >= 500 ? 72 : count >= 100 ? 60 : 48
+  return `
+    <div class="cluster-wrapper cluster-${ring}" style="width:${base}px;height:${base}px;">
+      <div class="cluster-ring ring-1"></div>
+      <div class="cluster-ring ring-2"></div>
+      <div class="cluster-core">
+        <span class="cluster-count">${count}</span>
+      </div>
+    </div>
+  `
+}
+
 const updateMarkers = () => {
   const AMap = (window as any).AMap
 
-  if (markers.length > 0) {
-    markers.forEach((m) => {
-      try {
-        m.setMap(null)
-      } catch (e) {
-        /* ignore */
-      }
-    })
-    markers = []
+  if (cluster) {
+    cluster.setMap(null)
+    cluster = null
   }
 
   let filteredData: MarkerItem[] = []
@@ -266,9 +274,9 @@ const updateMarkers = () => {
     }
   }
 
-  const iconMap: Record<string, any> = {}
+  const typeIconMapInner: Record<string, any> = {}
   Object.keys(typeIconMap).forEach((type) => {
-    iconMap[type] = new AMap.Icon({
+    typeIconMapInner[type] = new AMap.Icon({
       image: typeIconMap[type],
       size: new AMap.Size(24, 24),
       imageSize: new AMap.Size(24, 24),
@@ -282,33 +290,38 @@ const updateMarkers = () => {
     anchor: new AMap.Pixel(12, 12)
   })
 
-  filteredData.forEach((dataItem) => {
-    try {
-      const icon = iconMap[dataItem.type] || defaultIcon
-      const marker = new AMap.Marker({
-        position: dataItem.location,
-        extData: dataItem,
-        icon,
-        zIndex: 10
-      })
+  const dataMapping = filteredData.map((dataItem) => ({
+    lnglat: dataItem.location,
+    extData: dataItem
+  }))
 
-      marker.on('mouseover', () => {
+  cluster = new AMap.MarkerCluster(map, dataMapping, {
+    gridSize: 80,
+    maxZoom: 10,
+    renderMarker: (context: any) => {
+      const dataItem: MarkerItem = context.data[0].extData
+      const icon = typeIconMapInner[dataItem.type] || defaultIcon
+      context.marker.setIcon(icon)
+      context.marker.on('mouseover', () => {
         showInfoWindow(dataItem)
       })
-
-      marker.on('mouseout', () => {
+      context.marker.on('mouseout', () => {
         if (infoWindow) {
           infoWindow.close()
         }
       })
-
-      markers.push(marker)
-    } catch (error) {
-      console.error('创建标记点失败，数据:', dataItem, '错误:', error)
+    },
+    renderClusterMarker: (context: any) => {
+      const count = context.count
+      const base = count >= 500 ? 72 : count >= 100 ? 60 : 48
+      context.marker.setContent(createClusterMarkerContent(count))
+      context.marker.setAnchor(new AMap.Pixel(base / 2, base / 2))
+      context.marker.on('click', () => {
+        const zoom = map.getZoom()
+        map.setZoom(zoom + 2)
+      })
     }
   })
-
-  map.add(markers)
 }
 
 const initMap = async () => {
@@ -341,6 +354,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (cluster) {
+    cluster.setMap(null)
+    cluster = null
+  }
   if (map) {
     map.destroy()
     map = null
@@ -349,7 +366,6 @@ onBeforeUnmount(() => {
     infoWindow.close()
     infoWindow = null
   }
-  markers = []
 })
 </script>
 
@@ -484,5 +500,93 @@ onBeforeUnmount(() => {
 
 .amap-info-sharp {
   border-top-color: #00ffff !important;
+}
+
+.cluster-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.cluster-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+.cluster-ring.ring-1 {
+  inset: 0;
+  animation: cluster-pulse 2s ease-out infinite;
+}
+
+.cluster-ring.ring-2 {
+  inset: 0;
+  animation: cluster-pulse 2s ease-out infinite 1s;
+}
+
+.cluster-core {
+  position: relative;
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #22d3ee 0%, #0e7490 60%, #164e63 100%);
+  /* border: 2px solid rgba(255, 255, 255, 0.85); */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 0 12px rgba(0, 255, 255, 0.7),
+    0 0 24px rgba(0, 255, 255, 0.35),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 2px 6px rgba(255, 255, 255, 0.25);
+  z-index: 2;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.cluster-wrapper:hover .cluster-core {
+  transform: scale(1.1);
+  box-shadow:
+    0 0 16px rgba(0, 255, 255, 0.95),
+    0 0 32px rgba(0, 255, 255, 0.55),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 2px 6px rgba(255, 255, 255, 0.35);
+}
+
+.cluster-count {
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.cluster-wrapper.cluster-large .cluster-core {
+  width: 56%;
+  height: 56%;
+}
+
+.cluster-wrapper.cluster-large .cluster-count {
+  font-size: 15px;
+}
+
+@keyframes cluster-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+    border-width: 2px;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+    border-width: 0.5px;
+  }
 }
 </style>

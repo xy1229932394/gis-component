@@ -17,23 +17,27 @@ const routes: RouteRecordRaw[] = [
     name: 'AmapGisPreview',
     component: () => import('@/views/GisMarker/index.vue')
   },
+  //绘点
   {
-    path: '/gis-marker-preview',
+    path: '/gis-marker',
     name: 'GisMarkerPreview',
     component: () => import('@/views/GisMarker/index.vue')
   },
+  //绘面
   {
-    path: '/amap-area-preview',
+    path: '/amap-area',
     name: 'AmapAreaPreview',
     component: () => import('@/views/GisMarker/AmapPreview.vue')
   },
+  //聚合撒点
   {
-    path: '/amap-scatter-preview',
+    path: '/amap-scatter',
     name: 'AmapScatterPreview',
     component: () => import('@/views/GisScatter/AmapScatter.vue')
   },
+  //3D模型
   {
-    path: '/amap-model-preview',
+    path: '/amap-model',
     name: 'AmapModelPreview',
     component: () => import('@/views/GisModel/ModelPreview.vue')
   }

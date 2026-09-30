@@ -2,7 +2,7 @@ import AMapLoader from '@amap/amap-jsapi-loader'
 
 const defaultDemoKey = 'ae29a37307840c7ae4a785ac905927e0'
 
-const NEEDED_PLUGINS = ['AMap.Scale', 'AMap.MouseTool', 'AMap.PolygonEditor']
+const NEEDED_PLUGINS = ['AMap.Scale', 'AMap.MouseTool', 'AMap.PolygonEditor', 'AMap.MarkerCluster']
 
 let amapPromise: Promise<any> | null = null
 let currentKey = ''

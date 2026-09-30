@@ -14,7 +14,7 @@
         <p class="subtitle">选择一种航线绘制模式进入</p>
 
         <div class="menu-list">
-          <div class="menu-item" @click="goTo('/amap-area-preview')">
+          <div class="menu-item" @click="goTo('/amap-area')">
             <div class="menu-icon">
               <el-icon :size="30" color="#409eff"><MapLocation /></el-icon>
             </div>
@@ -25,7 +25,7 @@
             <el-icon class="menu-arrow" color="#909399"><ArrowRight /></el-icon>
           </div>
 
-          <div class="menu-item" @click="goTo('/gis-marker-preview')">
+          <div class="menu-item" @click="goTo('/gis-marker')">
             <div class="menu-icon">
               <el-icon :size="30" color="#67c23a"><Location /></el-icon>
             </div>
@@ -36,7 +36,7 @@
             <el-icon class="menu-arrow" color="#909399"><ArrowRight /></el-icon>
           </div>
 
-          <div class="menu-item" @click="goTo('/amap-scatter-preview')">
+          <div class="menu-item" @click="goTo('/amap-scatter')">
             <div class="menu-icon">
               <el-icon :size="30" color="#9370db"><Connection /></el-icon>
             </div>
@@ -47,7 +47,7 @@
             <el-icon class="menu-arrow" color="#909399"><ArrowRight /></el-icon>
           </div>
 
-          <div class="menu-item" @click="goTo('/amap-model-preview')">
+          <div class="menu-item" @click="goTo('/amap-model')">
             <div class="menu-icon">
               <el-icon :size="30" color="#e6a23c"><Box /></el-icon>
             </div>
